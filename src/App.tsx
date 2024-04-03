@@ -1,8 +1,5 @@
 import { useEffect, useState } from "react";
-import axios from "axios";
-
-const connect = () => console.log("Connecting");
-const disconnect = () => console.log("Disconnecting");
+import axios, { CanceledError } from "axios";
 
 interface User {
   id: number;
@@ -10,25 +7,35 @@ interface User {
 }
 
 function App() {
+  const controller = new AbortController();
+
   const [users, setUsers] = useState<User[]>([]);
   const [errorMsg, setErrorMsg] = useState("");
+  const [isLoading, setLoading] = useState(false);
 
   useEffect(() => {
-    connect();
-
+    setLoading(true);
     axios
-      .get<User[]>("https://jsonplaceholder.typicode.com/xusers")
-      .then((res) => {
-        console.log("success");
-        setUsers(res.data);
+      .get<User[]>("https://jsonplaceholder.typicode.com/users", {
+        signal: controller.signal,
       })
-      .catch((err) => setErrorMsg(err.message));
+      .then((res) => {
+        setUsers(res.data);
+        setLoading(false);
+      })
+      .catch((err) => {
+        if (err instanceof CanceledError) return;
+        setErrorMsg(err.message);
+        setLoading(false);
+      });
+    //.finally(() => setLoading(false)); - dosent work in strict mode
 
-    return () => disconnect();
+    return () => controller.abort();
   }, []);
   return (
     <div>
       {errorMsg && <h1>{errorMsg}</h1>}
+      {isLoading && <div className="spinner-border"></div>}
       <ul>
         {users.map((user) => (
           <li key={user.id}>{user.name}</li>
